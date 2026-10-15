@@ -28,6 +28,38 @@ main{padding:8px 18px}
 #painel button{padding:7px 10px}
 }
 @media (max-width:800px){nav{flex-wrap:nowrap}#painel .two{grid-template-columns:1fr}#painel .chart{height:220px}}
+
+/* Dashboard em viewport: altura determinada pela área útil do Safari */
+@media (min-width:900px) and (orientation:landscape){
+html,body{height:100%;overflow:hidden}
+body{display:flex;flex-direction:column;min-height:0}
+header{width:100%;flex:0 0 auto;padding:7px 16px 4px}
+header h1{font-size:21px}
+header small{font-size:12px}
+nav{width:100%;flex:0 0 auto;padding:3px 16px 7px;gap:5px;justify-content:space-between;overflow:visible}
+nav button{font-size:clamp(11px,1.14vw,15px);padding:7px clamp(5px,.85vw,12px)}
+main{flex:1;min-height:0;width:100%;max-width:1350px;overflow:hidden;padding:5px 16px 8px}
+#painel:not([hidden]){height:100%;display:grid;grid-template-rows:minmax(75px,.78fr) minmax(145px,1.7fr) minmax(160px,2.25fr);gap:8px;overflow:hidden}
+#painel .grid{height:100%;gap:8px}
+#painel .two{height:100%;min-height:0;gap:8px;grid-template-columns:1fr 1fr}
+#painel .card{min-height:0;overflow:hidden;padding:10px 13px}
+#painel .two .card{overflow:auto}
+#painel .big{font-size:clamp(19px,2.1vw,28px)}
+#painel .row[style]{padding:4px 0!important}
+#painel .wide{display:flex;flex-direction:column;min-height:0}
+#painel .wide>.row{flex:0 0 auto}
+#painel .chart{flex:1;min-height:0;height:100%;width:100%}
+#painel .wide>small{flex:0 0 auto;font-size:11px}
+main:has(section:not(#painel):not([hidden])){overflow:auto}
+}
+@media (min-width:900px) and (orientation:landscape) and (max-height:650px){
+#painel:not([hidden]){grid-template-rows:minmax(60px,.75fr) minmax(125px,1.7fr) minmax(135px,2fr)}
+#painel .card{padding:6px 10px}
+#painel .big{font-size:19px}
+#painel .row[style]{padding:2px 0!important}
+#painel h2{font-size:15px}
+#painel button{padding:5px 8px}
+}
 </style></head><body><header><div><h1>◇ Finanças da Família</h1><small>Controle financeiro doméstico · demonstração com dados fictícios</small></div><button id="bell" onclick="go('avisos')">🔔 <span id="alertcount">0</span></button></header><nav id="nav"></nav><main>
 <section id="painel"><div class="grid"><article class="card"><small>Saldo disponível</small><div class="big" id="balance">—</div><small>Contas correntes</small></article><article class="card"><small>Investimentos</small><div class="big" id="investTotal">—</div><small>Patrimônio aplicado</small></article><article class="card"><small>Saldo previsto em 30 dias</small><div class="big" id="forecast">—</div><small>Com lançamentos futuros</small></article></div>
 <div class="two"><article class="card"><div class="row"><h2>Últimos lançamentos</h2><button onclick="go('lancamentos')">Ver todos →</button></div><div id="recent"></div></article><article class="card"><div class="row"><h2>Próximos compromissos</h2><button onclick="go('projecoes')">Ver projeções →</button></div><div id="upcoming"></div></article></div>
