@@ -9,7 +9,7 @@ const Installments=(()=>{
    const easter=new Date(Date.UTC(year,Math.floor(n/31)-1,n%31+1)),holidays=new Set(extraHolidays);
    for(const md of ['01-01','04-21','05-01','09-07','10-12','11-02','11-15','11-20','12-25','12-31'])holidays.add(year+'-'+md);
    for(const offset of [-48,-47,-2,60]){const t=new Date(easter);t.setUTCDate(t.getUTCDate()+offset);holidays.add(t.toISOString().slice(0,10));}
-   while([0,6].includes(date.getUTCDay())||holidays.has(date.toISOString().slice(0,10)))date.setUTCDate(date.getUTCDate()-1);
+   while([0,6].includes(date.getUTCDay())||holidays.has(date.toISOString().slice(0,10)))date.setUTCDate(date.getUTCDate()+(previousBusinessDay==='next'?1:-1));
   }
   return date.toISOString().slice(0,10);
  }
@@ -65,8 +65,39 @@ const Installments=(()=>{
     if(remaining)rows.push({id:'income-forecast:'+income.id+':'+due,recurringIncomeId:income.id,accountId:income.accountId,date:due,value:remaining/100,description:income.name,future:true,kind:'income_forecast'});
    }
   }
+  rows.push(...expenseForecastRows(state,horizon));
   return rows;
  }
- return {schedule,dueAfter,forecastRows,incomeDueDate};
+ function expenseForecastRows(state,horizon){
+  const result=[],accountId=state.accounts?.[0]?.id,claimed=new Set(),norm=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/\s+/g,' ').trim();
+  for(const rule of state.recurringExpenses||[]){
+   if(rule.active===false||rule.accountId!==accountId||!Number.isFinite(rule.amount)||rule.amount<=0)continue;
+   const dates=[];
+   if(rule.frequency==='weekly'){
+    const date=new Date(rule.anchorDate+'T00:00:00Z');if(Number.isNaN(date.getTime()))continue;
+    const skip=Math.max(1,Math.floor((Date.parse(state.asOf)-date.getTime())/604800000)+1);date.setUTCDate(date.getUTCDate()+skip*7);
+    for(let n=0;n<60&&date.toISOString().slice(0,10)<=horizon;n++,date.setUTCDate(date.getUTCDate()+7))dates.push(date.toISOString().slice(0,10));
+   }else{
+    const start=new Date(state.asOf+'T00:00:00Z');
+    for(let n=0;n<24;n++){const month=new Date(Date.UTC(start.getUTCFullYear(),start.getUTCMonth()+n,1)),due=incomeDueDate(month.getUTCFullYear(),month.getUTCMonth()+1,rule.paymentDay,rule.businessDayRule==='next'?'next':false,state.additionalHolidays||[]);if(due>horizon)break;if(due>state.asOf&&due>rule.anchorDate)dates.push(due);}
+   }
+   for(const due of dates){
+    const booked=state.bankTransactions.find(t=>{
+     if(t.value>=0||claimed.has(t.id))return false;
+     const days=Math.abs(Date.parse(t.date)-Date.parse(due))/86400000;
+     if(rule.frequency==='weekly'?days>3:t.date.slice(0,7)!==due.slice(0,7)||days>7)return false;
+     if(t.recurringExpenseId===rule.id)return true;
+     if(norm(t.description)!==norm(rule.match?.description))return false;
+     if(rule.match?.detailToken)return (t.details||[]).some(d=>norm(d).includes(norm(rule.match.detailToken)));
+     return cents(Math.abs(t.value))===cents(rule.amount);
+    });
+    if(booked){claimed.add(booked.id);continue;}
+    const reference=state.bankTransactions.find(t=>t.id===rule.sourceTransactionId),reviewName=reference?.note?.trim();
+    result.push({id:'expense-forecast:'+rule.id+':'+due,recurringExpenseId:rule.id,accountId,date:due,value:-rule.amount,description:reviewName?reviewName.slice(0,120):rule.name,category:reference?.category||rule.category||'A revisar',future:true,kind:'expense_forecast',estimated:true,sourceTransactionId:rule.sourceTransactionId});
+   }
+  }
+  return result;
+ }
+ return {schedule,dueAfter,forecastRows,incomeDueDate,expenseForecastRows};
 })();
 if(typeof module!=='undefined')module.exports=Installments;
