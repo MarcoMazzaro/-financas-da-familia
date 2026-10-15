@@ -1,0 +1,17 @@
+const assert=require('node:assert/strict'),R=require('./recognition.js');
+const base={id:'1',description:'COMPRA NAC DEBIT',details:['LOJA EXEMPLO CIDADE BRA','DOC.: 1234'],value:-20,date:'2026-10-01',category:'Moradia',categoryConfirmed:true,note:'Observação só deste pagamento'};
+const next={...base,id:'2',date:'2026-11-01',value:-35,details:['LOJA EXEMPLO CIDADE BRA','DOC.: 5678'],category:'A revisar',categoryConfirmed:false,note:''};
+const s={bankTransactions:[structuredClone(base),next],cardTransactions:[]};
+R.refresh(s);assert.equal(next.category,'Moradia');assert.equal(next.categoryConfirmed,false);assert.equal(next.note,'');assert.equal(s.recognitionEvidence.length,1);
+R.refresh(s);assert.equal(s.recognitionEvidence.length,1,'Automatic classification must not train itself');
+next.category='Saúde';next.categoryConfirmed=true;R.refresh(s);assert.equal(s.recognitionRules[0].conflict,true);
+const ambiguous={id:'boleto1',description:'DÉB.TIT.COMPE.EFETI',details:['DOC.: 100'],value:-500,category:'Educação',categoryConfirmed:true};
+const unknown={...ambiguous,id:'boleto2',details:['DOC.: 200'],category:'A revisar',categoryConfirmed:false};
+const a={bankTransactions:[ambiguous,unknown],cardTransactions:[]};R.refresh(a);assert.equal(unknown.category,'A revisar');assert.equal(unknown.recognitionSuggestion.category,'Educação');
+const other={...unknown,id:'boleto3',value:-600};a.bankTransactions.push(other);R.refresh(a);assert.equal(other.recognitionSuggestion,undefined);
+const named={...base,id:'pix1',description:'TRANSF. PIX SICOOB',details:['FAV.: PESSOA A','DOC.: 10'],category:'Transferência familiar'};
+const stranger={...named,id:'pix2',details:['FAV.: PESSOA B','DOC.: 11'],category:'A revisar',categoryConfirmed:false};const p={bankTransactions:[named,stranger],cardTransactions:[]};R.refresh(p);assert.equal(stranger.category,'A revisar');
+const same={...stranger,id:'pix3',value:-70,details:['FAV.: PESSOA A','DOC.: 12']};p.bankTransactions.push(same);R.refresh(p);assert.equal(same.category,'Transferência familiar');
+same.recognitionDisabled=true;R.refresh(p);assert.equal(same.category,'A revisar');
+const roundtrip=JSON.parse(JSON.stringify(p));R.refresh(roundtrip);assert.equal(roundtrip.bankTransactions[0].note,base.note);
+console.log('Passed local learning, changed dates/amounts/documents, no self-training, conflicts, uncertain boletos, different beneficiaries, opt-out and backup persistence.');
