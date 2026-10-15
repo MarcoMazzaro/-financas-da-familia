@@ -4,6 +4,7 @@ const storageKey='familyPrivateSicoob20261015v2';
 let state=structuredClone(seedData), storageAvailable=true;
 try {const saved=localStorage.getItem(storageKey);if(saved){const parsed=JSON.parse(saved);FinanceCore.validate(parsed);state=parsed;}}catch(e){storageAvailable=false;}
 let activeTab='overview',cardId='master',holderFilter='',cardSearch='',bankSearch='',bankMode='realized',investmentDate='2026-10-14',investmentSearch='',editingRecord=null;
+let chartPeriod='day',chartFuture=false;
 const categories=['A revisar','Moradia','Supermercado','Alimentação fora de casa','Combustível','Saúde','Educação','Vestuário e cuidados','Viagens','Assinaturas e serviços digitais','Publicidade','Pets','Seguros','Documentação','Tarifas e encargos','Transferência entre contas próprias','Transferência familiar','Integralização de capital','Saque para carteira','Outros'];
 const money=n=>Number(n).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}),num=n=>n===null||n===undefined?'—':Number(n).toLocaleString('pt-BR',{maximumFractionDigits:8}),br=s=>s?s.split('-').reverse().join('/'):'Não informada',sum=FinanceCore.sum;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -28,7 +29,25 @@ function overviewView(){
  return `<div class="grid">${kpi('Saldo próprio em conta',money(bal),'Sicoob · posição em '+br(state.asOf))}${kpi('Carteira de investimentos',money(current.total),current.positions.length+' posições · '+br(current.date))}${kpi('Fatura Mastercard de outubro','Paga',money(master.invoiceTotal)+' · débito em '+br(master.paidDate))}</div>
  <div class="two"><article class="card"><h2>Conta e crédito separados</h2><dl><dt>Cheque especial contratado</dt><dd>${money(account.overdraftLimit)}</dd><dt>Disponível incluindo cheque especial</dt><dd>${money(bal+account.overdraftLimit)}</dd><dt>Crédito utilizado nesta posição</dt><dd>${money(Math.max(0,-bal))}</dd></dl><p class="muted">O limite de crédito não compõe seu saldo próprio nem seu patrimônio.</p><button data-tab="bank">Ver os ${realized.length} movimentos</button></article>
  <article class="card"><h2>Entradas e saídas da conta</h2><small>01/10 a 15/10/2026 · visão de caixa</small><dl><dt>Saldo anterior em 30/09</dt><dd>${money(account.openingBalance)}</dd><dt>Entradas</dt><dd class="positive">${money(credits)}</dd><dt>Saídas, incluindo pagamento do cartão</dt><dd class="negative">${money(debits)}</dd><dt>Saldo em 15/10</dt><dd><b>${money(bal)}</b></dd></dl></article></div>
- <article class="card"><h2>Importação conferida</h2><p>${state.checks.length} conferências de totais, saldos diários e faturas passaram. As categorias sugeridas ainda precisam de revisão.</p><div class="row"><span class="good">Pagamento do Mastercard vinculado à conta</span><button data-tab="audit">Ver a validação e os pontos de atenção</button></div></article><div class="footer">Versão local com dados pessoais. Não publicada no GitHub Pages. Sem sincronização entre dispositivos.</div>`;
+ ${cashChartView()}<article class="card"><h2>Importação conferida</h2><p>${state.checks.length} conferências de totais, saldos diários e faturas passaram. As categorias sugeridas ainda precisam de revisão.</p><div class="row"><span class="good">Pagamento do Mastercard vinculado à conta</span><button data-tab="audit">Ver a validação e os pontos de atenção</button></div></article><div class="footer">Versão local com dados pessoais. Não publicada no GitHub Pages. Sem sincronização entre dispositivos.</div>`;
+}
+function cashChartView(){
+ const series=FinanceCore.cashSeries(state.accounts[0],state.bankTransactions,state.asOf,chartPeriod,chartFuture);
+ const left=85,right=930,top=24,bottom=245,width=(right-left)/Math.max(1,series.length);
+ const min=Math.min(0,...series.map(g=>g.balance)),max=Math.max(1,...series.flatMap(g=>[g.balance,g.credit,g.debit])),span=max-min;
+ const y=v=>bottom-(v-min)/span*(bottom-top),zero=y(0),compact=v=>Math.abs(v)>=1000?(v/1000).toLocaleString('pt-BR',{maximumFractionDigits:1})+' mil':num(v);
+ let parts=[];
+ for(let n=0;n<=4;n++){const v=min+span*n/4,py=y(v);parts.push(`<line x1="${left}" y1="${py}" x2="${right}" y2="${py}" stroke="#e0e7ef"/><text x="${left-12}" y="${py+4}" text-anchor="end">${esc(compact(v))}</text>`);}
+ let actual=[],future=[];
+ series.forEach((g,i)=>{const x=left+(i+.5)*width,bw=Math.min(24,width*.29),label=br(g.from)+(g.to!==g.from?' a '+br(g.to):'');
+   parts.push(`<rect x="${x-bw-2}" y="${y(g.credit)}" width="${bw}" height="${Math.max(0,zero-y(g.credit))}" rx="2" fill="#4175bf" opacity="${g.forecast?.5:1}"><title>${esc(label)} · Créditos: ${money(g.credit)}</title></rect><rect x="${x+2}" y="${y(g.debit)}" width="${bw}" height="${Math.max(0,zero-y(g.debit))}" rx="2" fill="#c94d59" opacity="${g.forecast?.5:1}"><title>${esc(label)} · Débitos: ${money(g.debit)}</title></rect>`);
+   (g.forecast?future:actual).push(`${x},${y(g.balance)}`);
+   if(i%Math.max(1,Math.ceil(series.length/9))===0||i===series.length-1)parts.push(`<text x="${x}" y="277" text-anchor="middle">${g.from.slice(8)}/${g.from.slice(5,7)}</text>`);
+ });
+ if(future.length&&actual.length)future.unshift(actual.at(-1));
+ parts.push(`<polyline points="${actual.join(' ')}" fill="none" stroke="#2b815a" stroke-width="3"/><polyline points="${future.join(' ')}" fill="none" stroke="#d28b26" stroke-width="3" stroke-dasharray="7 5"/>`);
+ series.forEach((g,i)=>parts.push(`<circle cx="${left+(i+.5)*width}" cy="${y(g.balance)}" r="4" fill="${g.forecast?'#d28b26':'#2b815a'}"><title>${br(g.to)} · ${g.forecast?'Saldo previsto':'Saldo realizado'}: ${money(g.balance)}</title></circle>`));
+ return `<article class="card" id="cashChartCard"><div class="row"><h2>Créditos, débitos e saldo</h2><div class="chart-periods">${[['day','Dia'],['week','Semana'],['fortnight','Quinzena'],['month','Mês']].map(([id,name])=>`<button data-chart-period="${id}" class="${chartPeriod===id?'active':''}" aria-pressed="${chartPeriod===id}">${name}</button>`).join('')}</div></div><div class="row"><small>Conta corrente · valores em R$ · ${series.length?br(series[0].from)+' a '+br(series.at(-1).to):'Sem movimentos'}</small><label class="chart-toggle"><input type="checkbox" id="chartFuture" ${chartFuture?'checked':''}> Incluir agendados</label></div><div class="chart-scroll"><svg id="cashChart" viewBox="0 0 960 300" role="img" aria-label="Gráfico de créditos, débitos e saldo da conta corrente"><title>Créditos, débitos e saldo da conta corrente</title><g font-family="system-ui,sans-serif" font-size="13" fill="#63758b">${parts.join('')}</g></svg></div><div class="chart-legend"><span><i style="background:#4175bf"></i>Créditos</span><span><i style="background:#c94d59"></i>Débitos</span><span><i style="background:#2b815a"></i>Saldo realizado</span>${chartFuture?'<span><i style="background:#d28b26"></i>Saldo previsto (tracejado)</span>':''}</div><p class="muted">O pagamento do cartão aparece uma vez nos débitos da conta. Compras da fatura e limite de cheque especial não são somados ao gráfico.</p><details><summary>Ver valores do gráfico</summary>${table(['Período','Créditos','Débitos','Saldo ao final','Situação'],series.map(g=>`<tr><td>${br(g.from)}${g.to!==g.from?' a '+br(g.to):''}</td><td class="num">${money(g.credit)}</td><td class="num">${money(g.debit)}</td><td class="num">${money(g.balance)}</td><td>${g.forecast?'Previsto':'Realizado'}</td></tr>`))}</details></article>`;
 }
 function bankView(){
  const a=state.accounts[0],bal=FinanceCore.cashBalance(a,state.bankTransactions,state.asOf);
@@ -89,6 +108,7 @@ document.getElementById('addForm').addEventListener('submit',e=>{
  state.bankTransactions.push(transaction);state.bankTransactions.sort((a,b)=>a.date.localeCompare(b.date));save();document.getElementById('addDialog').close();e.target.reset();render();
 });
 document.addEventListener('click',e=>{
+ const chartButton=e.target.closest('[data-chart-period]');if(chartButton){chartPeriod=chartButton.dataset.chartPeriod;render();return;}
  const tab=e.target.closest('[data-tab]');if(tab){go(tab.dataset.tab);return;}
  const review=e.target.closest('[data-review]');if(review){openReview(review.dataset.review,review.dataset.ledger);return;}
  if(e.target.id==='newBank'){document.getElementById('addCategory').innerHTML=categories.map(c=>`<option>${esc(c)}</option>`).join('');document.querySelector('#addForm [name=date]').value=state.asOf;document.getElementById('addDialog').showModal();}
@@ -96,7 +116,8 @@ document.addEventListener('click',e=>{
 });
 document.addEventListener('change',e=>{
  const id=e.target.id,value=e.target.value;
- if(id==='cardSelect'){cardId=value;holderFilter='';cardSearch='';render();}
+ if(id==='chartFuture'){chartFuture=e.target.checked;render();}
+ else if(id==='cardSelect'){cardId=value;holderFilter='';cardSearch='';render();}
  else if(id==='holderFilter'){holderFilter=value==='operations'?'operations':value;render();}
  else if(id==='bankMode'){bankMode=value;render();}
  else if(id==='investmentDate'){investmentDate=value;render();updateCDIView();}

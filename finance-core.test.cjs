@@ -6,6 +6,12 @@ const rows=[{id:'purchase',cardId:'card',date:null,description:'Purchase',value:
 assert.equal(F.cashBalance(account,bank,'2026-10-15'),800,'Card payment affects cash once');
 assert.equal(F.cardSpending(rows),200,'Prior invoice payment is not a new expense');
 assert.equal(F.invoiceTotal(card,rows),200,'Opening debt plus all card movements equals invoice');
+const daily=F.cashSeries(account,bank,'2026-10-15');
+assert.equal(daily.at(-1).balance,800);assert.equal(F.sum(daily.map(r=>({value:r.debit}))),200);
+assert.equal(daily.length,15);assert.equal(daily.some(r=>r.forecast),false);
+const projected=F.cashSeries(account,bank,'2026-10-15','week',true);
+assert.equal(projected.at(-1).balance,750);assert.equal(projected.at(-1).forecast,true);
+const monthly=F.cashSeries(account,bank,'2026-10-15','month');assert.equal(monthly.length,1);assert.equal(monthly[0].debit,200);assert.equal(monthly[0].balance,800);
 const merged=F.mergeRecords(bank,bank);assert.equal(merged.added,0);assert.equal(merged.duplicates,2);assert.equal(merged.records.length,2);
 assert.throws(()=>F.mergeRecords(bank,[{...bank[0],value:-300}]),/Conflito/);
 const distinct=F.mergeRecords(bank,[{...bank[0],id:'different-document'}]);assert.equal(distinct.records.length,3,'Same amount with distinct bank document must survive');
