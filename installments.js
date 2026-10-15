@@ -26,6 +26,19 @@ const Installments=(()=>{
   const purchaseTotal=result.reduce((s,m)=>s+cents(m.netPurchases),0)/100,feeTotal=result.reduce((s,m)=>s+cents(m.fees),0)/100;
   return {cardId:card.id,months:result,items,purchaseTotal,feeTotal,total:(cents(purchaseTotal)+cents(feeTotal))/100,reportedDifference:Number.isFinite(card.futureInstallmentBalance)?(cents(purchaseTotal)-cents(card.futureInstallmentBalance))/100:null,nextFieldDifference:result.length&&Number.isFinite(card.nextInstallments)?(cents(card.nextInstallments)-cents(result[0].netPurchases))/100:null,feeRoundingDifference:Number.isFinite(card.futureFeeBalance)?(cents(feeTotal)-cents(card.futureFeeBalance))/100:null};
  }
- return {schedule,dueAfter};
+ function forecastRows(state){
+  const rows=[...state.bankTransactions];
+  for(const card of state.cards){
+   const brand=/mastercard/i.test(card.name)?'MASTERCARD':/visa/i.test(card.name)?'VISA':null;
+   for(const month of schedule(card,state.cardTransactions).months){
+    if(month.due<=state.asOf)continue;
+    const booked=state.bankTransactions.filter(t=>t.date===month.due&&t.value<0&&(t.cardId===card.id||t.invoiceCardId===card.id||t.kind==='card_payment'&&brand&&[t.description,...(t.details||[])].join(' ').toUpperCase().includes(brand))).reduce((s,t)=>s+cents(-t.value),0);
+    const remaining=Math.max(0,cents(month.total)-booked);
+    if(remaining)rows.push({id:'forecast:'+card.id+':'+month.due,cardId:card.id,date:month.due,value:-remaining/100,description:'Previsão de parcelas e anuidade · '+card.name,future:true,kind:'card_forecast'});
+   }
+  }
+  return rows;
+ }
+ return {schedule,dueAfter,forecastRows};
 })();
 if(typeof module!=='undefined')module.exports=Installments;

@@ -7,9 +7,9 @@ const FinanceCore = (() => {
   }
   function invoiceTotal(card, rows) { return (cents(card.openingInvoice) + rows.filter(t=>t.cardId===card.id).reduce((s,t)=>s+cents(t.value),0))/100; }
   function cardSpending(rows) { return sum(rows.filter(t=>t.kind!=='payment')); }
-  function cashSeries(account, rows, cutoff, period='day', includeFuture=false) {
+  function cashSeries(account, rows, cutoff, period='day', includeFuture=false, endDate=null) {
     const eligible=rows.filter(t=>t.date>account.openingDate && (t.date<=cutoff&&!t.future || includeFuture&&t.date>cutoff));
-    const end=includeFuture?eligible.reduce((last,t)=>t.date>last?t.date:last,cutoff):cutoff;
+    const end=includeFuture?(endDate||eligible.reduce((last,t)=>t.date>last?t.date:last,cutoff)):cutoff;
     const day=new Date(account.openingDate+'T00:00:00Z');day.setUTCDate(day.getUTCDate()+1);
     const groups=[];let balance=cents(account.openingBalance),count=0;
     while(day.toISOString().slice(0,10)<=end){

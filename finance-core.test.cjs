@@ -12,6 +12,7 @@ assert.equal(daily.length,15);assert.equal(daily.some(r=>r.forecast),false);
 const projected=F.cashSeries(account,bank,'2026-10-15','week',true);
 assert.equal(projected.at(-1).balance,750);assert.equal(projected.at(-1).forecast,true);
 const monthly=F.cashSeries(account,bank,'2026-10-15','month');assert.equal(monthly.length,1);assert.equal(monthly[0].debit,200);assert.equal(monthly[0].balance,800);
+const horizon=F.cashSeries(account,bank,'2026-10-15','day',true,'2026-10-31');assert.equal(horizon.at(-1).to,'2026-10-31');assert.equal(horizon.at(-1).balance,800,'Payments after selected horizon must not enter balance');
 const merged=F.mergeRecords(bank,bank);assert.equal(merged.added,0);assert.equal(merged.duplicates,2);assert.equal(merged.records.length,2);
 assert.throws(()=>F.mergeRecords(bank,[{...bank[0],value:-300}]),/Conflito/);
 const distinct=F.mergeRecords(bank,[{...bank[0],id:'different-document'}]);assert.equal(distinct.records.length,3,'Same amount with distinct bank document must survive');

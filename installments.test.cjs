@@ -6,4 +6,8 @@ assert.equal(s.months[0].netPurchases,80);assert.equal(s.months[0].entries[0].in
 assert.equal(I.dueAfter({dueDate:'2027-01-31',dueDay:31},1),'2027-02-28');
 assert.equal(I.dueAfter({dueDate:'2027-12-11',dueDay:11},1),'2028-01-11');
 const zero=I.schedule(card,rows.filter(t=>['payment','paid','other'].includes(t.id)));assert.equal(zero.total,0);assert.equal(zero.months.length,0);
+const forecast={asOf:'2026-10-15',cards:[{...card,name:'Cartão exemplo'}],cardTransactions:rows,bankTransactions:[]};
+const first=I.forecastRows(forecast);assert.equal(first.length,2);assert.equal(first[0].value,-90);assert.equal(forecast.bankTransactions.length,0,'Forecast does not write bank postings');
+forecast.bankTransactions=[{id:'scheduled',date:'2026-11-11',value:-90,cardId:'test',future:true}];assert.equal(I.forecastRows(forecast).filter(t=>t.date==='2026-11-11').length,1,'Scheduled card payment must not be duplicated');
+forecast.bankTransactions[0].value=-30;assert.equal(I.forecastRows(forecast).filter(t=>t.date==='2026-11-11').reduce((s,t)=>s+t.value,0),-90,'Only remaining forecast after a partial scheduled payment');
 console.log('Passed remaining installments only, signed refunds, separate gross fees, no assumed discounts, invoice/card separation, month rollover and maturity dates.');
