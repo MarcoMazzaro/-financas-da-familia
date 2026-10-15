@@ -1,0 +1,12 @@
+const assert=require('node:assert/strict'),F=require('./finance-core.js');
+const account={openingDate:'2026-09-30',openingBalance:1000};
+const bank=[{id:'bank-1',date:'2026-10-13',description:'Card payment',value:-200,kind:'card_payment',future:false},{id:'bank-2',date:'2026-11-05',description:'Future bill',value:-50,future:true}];
+const card={id:'card',openingInvoice:150};
+const rows=[{id:'purchase',cardId:'card',date:null,description:'Purchase',value:220,kind:'purchase'},{id:'refund',cardId:'card',date:null,description:'Refund',value:-20,kind:'refund'},{id:'prior-payment',cardId:'card',date:'2026-09-11',description:'Previous invoice payment',value:-150,kind:'payment'}];
+assert.equal(F.cashBalance(account,bank,'2026-10-15'),800,'Card payment affects cash once');
+assert.equal(F.cardSpending(rows),200,'Prior invoice payment is not a new expense');
+assert.equal(F.invoiceTotal(card,rows),200,'Opening debt plus all card movements equals invoice');
+const merged=F.mergeRecords(bank,bank);assert.equal(merged.added,0);assert.equal(merged.duplicates,2);assert.equal(merged.records.length,2);
+assert.throws(()=>F.mergeRecords(bank,[{...bank[0],value:-300}]),/Conflito/);
+const distinct=F.mergeRecords(bank,[{...bank[0],id:'different-document'}]);assert.equal(distinct.records.length,3,'Same amount with distinct bank document must survive');
+console.log('Passed separate ledgers, invoice roll-forward, future exclusion, idempotent merge and conflicting/stable IDs.');

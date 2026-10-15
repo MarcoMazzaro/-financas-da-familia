@@ -25,3 +25,13 @@ A aplicação é uma demonstração estática com dados no localStorage (`family
 - Tributos, vencimentos e rentabilidade líquida nas projeções. Projeções atuais são simplificadas e brutas.
 
 Validação automatizada: `node tests.cjs` (sintaxe, validação CSV, prévia sem mutação, confirmação dupla, deduplicação, conflitos e ausência de lançamentos bancários).
+
+## Protótipo local com conta, cartões e investimentos
+
+`prototype-v2.html`, `prototype-v2.js` e `finance-core.js` implementam uma versão local com três registros separados: caixa bancário, gastos/faturas de cartões e posições de investimentos. Pagamento de fatura impacta caixa uma vez; compras e estornos ficam no cartão. Limite de crédito é separado do saldo próprio. Posições de períodos diferentes não são somadas. Proventos têm registro próprio.
+
+A interface tem busca, filtro por portador, parcelas, histórico por posição, detalhes de origem, conferências, revisão de categorias, inclusão manual de movimento bancário e cópia/restauração local. A consulta de CDI não envia dados financeiros ao Banco Central. Taxas contratuais ausentes não são substituídas por 100% do CDI.
+
+O modelo HTML é compilado com um JSON privado fornecido localmente: `node build-prototype.cjs <dados-privados.json> <saida.html>`. O HTML resultante incorpora dados pessoais e **não deve ser versionado nem publicado**. Os arquivos de dados e documentos de origem permanecem fora deste repositório; o GitHub Pages existente não foi alterado nesta etapa.
+
+Teste das regras: `node finance-core.test.cjs`. A interface local foi verificada em Chromium nas larguras de 1024, 768 e 390 pixels, com filtros, contagens, persistência das revisões e efeito de movimento manual no saldo. Safari/iPad real ainda não foi testado.
