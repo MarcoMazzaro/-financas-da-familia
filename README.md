@@ -35,3 +35,11 @@ A interface tem busca, filtro por portador, parcelas, histórico por posição, 
 O modelo HTML é compilado com um JSON privado fornecido localmente: `node build-prototype.cjs <dados-privados.json> <saida.html>`. O HTML resultante incorpora dados pessoais e **não deve ser versionado nem publicado**. Os arquivos de dados e documentos de origem permanecem fora deste repositório; o GitHub Pages existente não foi alterado nesta etapa.
 
 Teste das regras: `node finance-core.test.cjs`. A interface local foi verificada em Chromium nas larguras de 1024, 768 e 390 pixels, com filtros, contagens, persistência das revisões e efeito de movimento manual no saldo. Safari/iPad real ainda não foi testado.
+
+### Reconhecimento a partir das revisões
+
+`recognition.js` aprende localmente com categorias confirmadas. Ao abrir a versão atualizada, as revisões existentes no mesmo armazenamento local são preservadas e viram evidências. A aba Aprendizado mostra regras, observações e conflitos. Categorias automáticas não treinam novas regras, notas de um pagamento não são copiadas para outro, e classificações manuais são preservadas. Histórico genérico de boleto/Pix com valor semelhante gera somente sugestão; categorias conflitantes suspendem a regra.
+
+Na conta corrente, Importar lançamentos aceita JSON estruturado com `accountId`, `asOf` e `bankTransactions` (cada registro: `id` estável, `date` ISO, `description`, `value` numérico com sinal e `details` como lista de textos). A prévia não altera o estado. A confirmação mescla IDs sem duplicar registros existentes, preserva revisões e aplica regras aos novos movimentos. Não é um leitor universal de PDF/Excel, nem importa novas faturas de cartão. Cópias de segurança incluem as regras locais.
+
+Validação adicional: `node recognition.test.cjs`, além de simulação isolada com revisões fictícias, preservação do estado existente, prévia, nova importação e reimportação. A simulação não acessa o navegador do usuário nem suas revisões reais.

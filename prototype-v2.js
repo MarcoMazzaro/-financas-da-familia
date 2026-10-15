@@ -13,14 +13,14 @@ const cardAmount=v=>`<span class="${v>0?'negative':'positive'}">${v<0?'−':''}$
 const source=s=>s?`<small class="source">${esc(s.file||'')}${s.page?' · página '+s.page:''}${s.sheet?' · '+esc(s.sheet):''}${s.row?' · linha '+s.row:''}</small>`:'<small>Registro manual</small>';
 const table=(headers,rows,cls='')=>`<div class="table-wrap"><table class="${cls}"><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.length?rows.join(''):`<tr><td colspan="${headers.length}" class="empty">Nenhum registro neste filtro.</td></tr>`}</tbody></table></div>`;
 const kpi=(label,value,note)=>`<article class="card"><small>${label}</small><div class="big">${value}</div><small>${note}</small></article>`;
-const categoryButton=(t,ledger)=>`<button class="category" data-review="${esc(t.id)}" data-ledger="${ledger}">${esc(t.category)}${t.categoryConfirmed?' ✓':' · revisar'}</button>${t.note?`<small>${esc(t.note)}</small>`:''}`;
-function save(){try{localStorage.setItem(storageKey,JSON.stringify(state));storageAvailable=true;}catch(e){storageAvailable=false;}renderStorage();}
+const categoryButton=(t,ledger)=>`<button class="category" data-review="${esc(t.id)}" data-ledger="${ledger}">${esc(t.category)}${t.categoryConfirmed?' ✓':t.categorySource==='learned'?' · reconhecida':' · revisar'}</button>${t.note?`<small>${esc(t.note)}</small>`:''}${t.recognitionSuggestion?`<small>Sugestão: ${esc(t.recognitionSuggestion.category)}. Confirme o beneficiário.</small>`:''}`;
+function save(){Recognition.refresh(state);try{localStorage.setItem(storageKey,JSON.stringify(state));storageAvailable=true;}catch(e){storageAvailable=false;}renderStorage();}
 function renderStorage(){document.getElementById('storageWarning').innerHTML=storageAvailable?'':`<div class="note">Este navegador não está salvando alterações. Use “Salvar cópia” antes de fechar.</div>`;}
 function go(tab){activeTab=tab;render();window.scrollTo({top:0});}
 function render(){
- const tabs=[['overview','Visão geral'],['bank','Conta corrente'],['cards','Cartões e faturas'],['investments','Investimentos'],['income','Proventos'],['future','Próximos pagamentos'],['audit','Validação']];
+ const tabs=[['overview','Visão geral'],['bank','Conta corrente'],['cards','Cartões e faturas'],['investments','Investimentos'],['income','Proventos'],['future','Próximos pagamentos'],['learning','Aprendizado'],['audit','Validação']];
  document.getElementById('navigation').innerHTML=tabs.map(([id,label])=>`<button data-tab="${id}" class="${id===activeTab?'active':''}" ${id===activeTab?'aria-current="page"':''}>${label}</button>`).join('');
- document.getElementById('content').innerHTML=({overview:overviewView,bank:bankView,cards:cardsView,investments:investmentsView,income:incomeView,future:futureView,audit:auditView}[activeTab])();
+ document.getElementById('content').innerHTML=({overview:overviewView,bank:bankView,cards:cardsView,investments:investmentsView,income:incomeView,future:futureView,learning:learningView,audit:auditView}[activeTab])();
  renderStorage();
 }
 function overviewView(){
@@ -29,7 +29,7 @@ function overviewView(){
  return `<div class="grid">${kpi('Saldo próprio em conta',money(bal),'Sicoob · posição em '+br(state.asOf))}${kpi('Carteira de investimentos',money(current.total),current.positions.length+' posições · '+br(current.date))}${kpi('Fatura Mastercard de outubro','Paga',money(master.invoiceTotal)+' · débito em '+br(master.paidDate))}</div>
  <div class="two"><article class="card"><h2>Conta e crédito separados</h2><dl><dt>Cheque especial contratado</dt><dd>${money(account.overdraftLimit)}</dd><dt>Disponível incluindo cheque especial</dt><dd>${money(bal+account.overdraftLimit)}</dd><dt>Crédito utilizado nesta posição</dt><dd>${money(Math.max(0,-bal))}</dd></dl><p class="muted">O limite de crédito não compõe seu saldo próprio nem seu patrimônio.</p><button data-tab="bank">Ver os ${realized.length} movimentos</button></article>
  <article class="card"><h2>Entradas e saídas da conta</h2><small>01/10 a 15/10/2026 · visão de caixa</small><dl><dt>Saldo anterior em 30/09</dt><dd>${money(account.openingBalance)}</dd><dt>Entradas</dt><dd class="positive">${money(credits)}</dd><dt>Saídas, incluindo pagamento do cartão</dt><dd class="negative">${money(debits)}</dd><dt>Saldo em 15/10</dt><dd><b>${money(bal)}</b></dd></dl></article></div>
- ${cashChartView()}<article class="card"><h2>Importação conferida</h2><p>${state.checks.length} conferências de totais, saldos diários e faturas passaram. As categorias sugeridas ainda precisam de revisão.</p><div class="row"><span class="good">Pagamento do Mastercard vinculado à conta</span><button data-tab="audit">Ver a validação e os pontos de atenção</button></div></article><div class="footer">Versão local com dados pessoais. Não publicada no GitHub Pages. Sem sincronização entre dispositivos.</div>`;
+ ${cashChartView()}<article class="card"><h2>Aprendizado das suas revisões</h2><p>${state.recognitionEvidence.length} revisões aproveitadas em ${state.recognitionRules.length} regras locais. Novos lançamentos identificáveis recebem a categoria aprendida; Pix e boletos genéricos continuam sujeitos a conferência.</p><button data-tab="learning">Ver o que o sistema aprendeu</button></article><article class="card"><h2>Importação conferida</h2><p>${state.checks.length} conferências de totais, saldos diários e faturas passaram. As categorias sugeridas ainda precisam de revisão.</p><div class="row"><span class="good">Pagamento do Mastercard vinculado à conta</span><button data-tab="audit">Ver a validação e os pontos de atenção</button></div></article><div class="footer">Versão local com dados pessoais. Não publicada no GitHub Pages. Sem sincronização entre dispositivos.</div>`;
 }
 function cashChartView(){
  const series=FinanceCore.cashSeries(state.accounts[0],state.bankTransactions,state.asOf,chartPeriod,chartFuture);
@@ -53,7 +53,7 @@ function bankView(){
  const a=state.accounts[0],bal=FinanceCore.cashBalance(a,state.bankTransactions,state.asOf);
  const rows=state.bankTransactions.filter(t=>(bankMode==='all'||(bankMode==='future'?t.future:!t.future))&&[t.description,...t.details].join(' ').toLowerCase().includes(bankSearch.toLowerCase()));
  let running=a.openingBalance;const balances=new Map();for(const t of state.bankTransactions.filter(t=>!t.future)){running=Math.round((running+t.value)*100)/100;balances.set(t.id,running);}
- return `<div class="row"><h2>Conta corrente Sicoob</h2><button class="primary" id="newBank">+ Novo movimento</button></div><div class="grid">${kpi('Saldo próprio',money(bal),'Até '+br(state.asOf))}${kpi('Cheque especial',money(a.overdraftLimit),'Limite contratado, separado do saldo')}${kpi('Disponível com crédito',money(a.availableIncludingCredit),'Valor informado no extrato')}</div>
+ return `<div class="row"><h2>Conta corrente Sicoob</h2><div><button id="newStatement">Importar lançamentos</button> <button class="primary" id="newBank">+ Novo movimento</button></div></div><div class="grid">${kpi('Saldo próprio',money(bal),'Até '+br(state.asOf))}${kpi('Cheque especial',money(a.overdraftLimit),'Limite contratado, separado do saldo')}${kpi('Disponível com crédito',money(a.availableIncludingCredit),'Valor informado no extrato')}</div>
  <article class="card"><details><summary>Dados da conta, limites e encargos</summary><dl><dt>Cooperativa / conta</dt><dd>${esc(a.cooperative)} / ${esc(a.accountNumber)}</dd><dt>Período do extrato</dt><dd>01/10 a 15/10/2026</dd><dt>Vencimento do cheque especial</dt><dd>${br(a.overdraftMaturity)}</dd><dt>Taxa de cheque especial</dt><dd>${num(a.overdraftMonthlyRate)}% a.m.</dd><dt>CET</dt><dd>${num(a.cetMonthly)}% a.m. / ${num(a.cetAnnual)}% a.a.</dd><dt>Crédito pessoal disponível (limite)</dt><dd>${money(a.personalCreditLimit)}</dd><dt>Parcela máxima disponível</dt><dd>${money(a.maxPersonalCreditPayment)}</dd><dt>Bloqueios e encargos provisionados</dt><dd>R$ 0,00 no extrato</dd></dl></details>
  <div class="toolbar"><label>Movimentos<select id="bankMode"><option value="realized" ${bankMode==='realized'?'selected':''}>Realizados</option><option value="future" ${bankMode==='future'?'selected':''}>Agendados</option><option value="all" ${bankMode==='all'?'selected':''}>Todos</option></select></label><label>Buscar<input id="bankSearch" value="${esc(bankSearch)}" placeholder="Histórico ou favorecido"></label></div><p class="muted">${rows.length} registros no filtro. Histórico do banco preservado; categoria é sugestão até sua revisão.</p>
  ${table(['Data','Histórico e detalhes','Categoria','Valor','Saldo próprio após movimento'],rows.map(t=>`<tr><td>${br(t.date)}${t.future?'<small>Agendado</small>':''}</td><td>${esc(t.description)}${t.kind==='card_payment'?'<small class="good">Pagamento vinculado à fatura Mastercard</small>':''}<details><summary>Detalhes do extrato</summary><p>${t.details.map(esc).join('<br>')}</p>${source(t.source)}</details></td><td>${categoryButton(t,'bank')}</td><td class="num">${signed(t.value)}</td><td class="num">${t.future?'—':money(balances.get(t.id))}</td></tr>`))}
@@ -95,12 +95,45 @@ function futureView(){
 function auditView(){
  return `<h2>Validação dos arquivos</h2><article class="card"><div class="row"><span class="good">${state.checks.length} conferências aritméticas sem diferença</span><button id="restoreSources">Restaurar dados dos arquivos</button></div><p>Conferência de consistência interna dos documentos. A finalidade dos Pix, boletos e categorias sugeridas ainda depende da sua revisão.</p>${table(['Fonte','Conteúdo','Referência','Registros'],state.sources.map(s=>`<tr><td>${esc(s.file)}</td><td>${esc(s.kind)}</td><td>${esc(s.period)}</td><td>${s.records}</td></tr>`))}</article><article class="card"><h3>O que foi conferido e o que precisa de atenção</h3>${state.findings.map(f=>`<div class="finding"><b>${esc(f.title)}</b><p>${esc(f.text)}</p></div>`).join('')}</article><article class="card"><details><summary>Ver todas as conferências de saldo e total</summary>${table(['Conferência','Fonte','Informado','Calculado','Diferença'],state.checks.map(c=>`<tr><td>${esc(c.label)}</td><td>${esc(c.source)}</td><td class="num">${money(c.stated)}</td><td class="num">${money(c.computed)}</td><td class="num">${money(c.difference)}</td></tr>`),'checks')}</details><p class="muted">As conferências registram a importação original. Categorias e observações podem ser revistas sem alterar valores e descrições dos arquivos. Registros manuais são identificados à parte.</p></article>`;
 }
+function learningView(){
+ const rules=state.recognitionRules||[],evidence=state.recognitionEvidence||[],confirmed=evidence.length,conflicts=rules.filter(r=>r.conflict).length;
+ const manual=state.bankTransactions.filter(t=>t.categoryConfirmed),notesOnly=state.bankTransactions.filter(t=>t.note&&!t.categoryConfirmed);
+ return `<h2>O que o sistema aprendeu</h2><div class="grid">${kpi('Revisões aproveitadas',num(confirmed),'Categorias confirmadas por você')}${kpi('Regras locais',num(rules.length),'Conta e cartões aprendem separadamente')}${kpi('Regras conflitantes',num(conflicts),'Conflitos impedem classificação automática')}</div><article class="card"><p>Suas revisões salvas neste navegador são analisadas ao abrir o protótipo e a cada nova revisão. Beneficiário, estabelecimento ou convênio identificável permitem reconhecer a categoria mesmo que a data e o valor mudem. O texto e as observações originais são preservados.</p><div class="note">Pix ou boletos com histórico genérico e sem beneficiário geram apenas sugestões. Valor igual não basta para confirmar a finalidade. Categorias reconhecidas ficam identificadas e podem ser corrigidas.</div>${table(['Identificação aprendida','Categoria','Como será usada','Revisões de origem'],rules.map(r=>`<tr><td>${esc(r.label)}<small>${r.ledger==='bank'?'Conta corrente':'Cartão'}</small></td><td>${esc(r.categories.join(' / '))}</td><td>${r.conflict?'Conflito: revisar, sem aplicação automática':r.strength==='automatic'?'Reconhecimento automático':'Sugestão; confirmar beneficiário'}</td><td>${r.evidenceCount}</td></tr>`))}</article><article class="card"><details><summary>Revisões da conta analisadas pelo sistema (${manual.length})</summary>${table(['Lançamento','Categoria confirmada','Sua observação'],manual.map(t=>`<tr><td>${br(t.date)} · ${esc(t.description)}<small>${money(t.value)}</small></td><td>${esc(t.category)}</td><td>${esc(t.note)||'—'}</td></tr>`))}</details>${notesOnly.length?`<p>${notesOnly.length} lançamentos têm observações, mas ainda estão sem categoria confirmada. As observações foram preservadas; não viraram regras de classificação.</p>`:''}<p class="muted">Aprendizado determinístico e local, sem envio de revisões à internet. As regras acompanham “Salvar cópia”. Restaurar os arquivos originais remove também as regras e revisões desta versão.</p></article>`;
+}
+let pendingBankImport=null;
+document.getElementById('newStatementFile').addEventListener('change',async e=>{
+ pendingBankImport=null;
+ try{
+  const file=e.target.files[0];if(!file)return;
+  const incoming=JSON.parse(await file.text()),account=state.accounts[0];
+  if(!Array.isArray(incoming.bankTransactions))throw Error('Use um arquivo JSON estruturado com bankTransactions. PDFs e planilhas precisam ser preparados antes da importação.');
+  if(incoming.accountId!==account.id)throw Error('O arquivo deve identificar accountId como '+account.id+'.');
+  const cutoff=incoming.asOf||state.asOf;
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(cutoff)||Number.isNaN(Date.parse(cutoff))||cutoff<state.asOf)throw Error('Data da posição inválida ou anterior à posição atual.');
+  const rows=incoming.bankTransactions.map(t=>{
+   if(!t.id||!/^\d{4}-\d{2}-\d{2}$/.test(t.date)||Number.isNaN(Date.parse(t.date))||t.date<=account.openingDate||typeof t.description!=='string'||!t.description.trim()||!Number.isFinite(t.value)||!Array.isArray(t.details)||t.details.some(d=>typeof d!=='string'))throw Error('Cada movimento precisa de id estável, data válida, descrição, valor numérico e detalhes.');
+   return {...t,category:'A revisar',categoryConfirmed:false,categorySource:undefined,note:'',accountId:account.id,future:t.date>cutoff,source:{file:file.name},recognitionDisabled:false};
+  });
+  const trial=structuredClone(state),merged=FinanceCore.mergeRecords(trial.bankTransactions,rows);
+  trial.bankTransactions=merged.records.sort((a,b)=>a.date.localeCompare(b.date));trial.asOf=cutoff;
+  const learned=Recognition.refresh(trial);FinanceCore.validate(trial);
+  pendingBankImport={trial,base:JSON.stringify(state)};
+  document.getElementById('importSummary').innerHTML=`<p>${merged.added} novos lançamentos; ${merged.duplicates} já existentes, preservados com suas revisões.</p><p>Na base completa: ${learned.automatic} categorias reconhecidas e ${learned.suggestions} sugestões que exigem confirmação.</p><p>Posição: ${br(cutoff)}. Novo saldo próprio: ${money(FinanceCore.cashBalance(account,trial.bankTransactions,cutoff))}.</p><p class="muted">Somente conta corrente. Use identificadores estáveis da origem; pagamentos de fatura devem manter seu identificador bancário. Nenhuma compra de cartão será criada.</p>`;
+  document.getElementById('importDialog').showModal();
+ }catch(error){document.getElementById('message').textContent='Importação não realizada: '+error.message;}
+ finally{e.target.value='';}
+});
+document.getElementById('confirmBankImport').addEventListener('click',()=>{
+ if(!pendingBankImport)return;
+ if(pendingBankImport.base!==JSON.stringify(state)){document.getElementById('message').textContent='Os dados mudaram. Selecione o arquivo para conferir novamente.';pendingBankImport=null;return;}
+ state=pendingBankImport.trial;pendingBankImport=null;save();document.getElementById('importDialog').close();render();document.getElementById('message').textContent='Lançamentos importados; suas revisões e regras foram preservadas.';
+});
 function openReview(id,ledger){
  const t=(ledger==='bank'?state.bankTransactions:state.cardTransactions).find(t=>t.id===id);if(!t)return;
  editingRecord=t;document.getElementById('editDescription').textContent=t.description+' · '+money(t.value);
  document.getElementById('editCategory').innerHTML=categories.map(c=>`<option ${c===t.category?'selected':''}>${esc(c)}</option>`).join('');document.getElementById('editNote').value=t.note||'';document.getElementById('editDialog').showModal();
 }
-document.getElementById('editForm').addEventListener('submit',e=>{e.preventDefault();if(!editingRecord)return;editingRecord.category=document.getElementById('editCategory').value;editingRecord.categoryConfirmed=editingRecord.category!=='A revisar';editingRecord.note=document.getElementById('editNote').value.trim();save();document.getElementById('editDialog').close();editingRecord=null;render();});
+document.getElementById('editForm').addEventListener('submit',e=>{e.preventDefault();if(!editingRecord)return;delete editingRecord.categorySource;delete editingRecord.categoryBeforeRule;delete editingRecord.recognitionRule;editingRecord.category=document.getElementById('editCategory').value;editingRecord.recognitionDisabled=editingRecord.category==='A revisar';editingRecord.categoryConfirmed=editingRecord.category!=='A revisar';editingRecord.note=document.getElementById('editNote').value.trim();save();document.getElementById('editDialog').close();editingRecord=null;render();});
 document.getElementById('addForm').addEventListener('submit',e=>{
  e.preventDefault();const values=Object.fromEntries(new FormData(e.target));const description=values.description.trim(),value=Number(values.value)*Number(values.direction);
  if(!description||!Number.isFinite(value)||!value||values.date<='2026-09-30'){alert('Confira a descrição, valor e data posterior a 30/09/2026.');return;}
@@ -111,6 +144,7 @@ document.addEventListener('click',e=>{
  const chartButton=e.target.closest('[data-chart-period]');if(chartButton){chartPeriod=chartButton.dataset.chartPeriod;render();return;}
  const tab=e.target.closest('[data-tab]');if(tab){go(tab.dataset.tab);return;}
  const review=e.target.closest('[data-review]');if(review){openReview(review.dataset.review,review.dataset.ledger);return;}
+ if(e.target.id==='newStatement'){document.getElementById('newStatementFile').click();}
  if(e.target.id==='newBank'){document.getElementById('addCategory').innerHTML=categories.map(c=>`<option>${esc(c)}</option>`).join('');document.querySelector('#addForm [name=date]').value=state.asOf;document.getElementById('addDialog').showModal();}
  if(e.target.id==='restoreSources'&&confirm('Restaurar a importação original? Categorias revisadas, notas e registros manuais desta versão local serão removidos. Salve uma cópia antes de continuar.')){state=structuredClone(seedData);save();render();}
 });
@@ -144,4 +178,4 @@ async function fetchCDI(){
  try{const r=await fetch('https://api.bcb.gov.br/dados/serie/bcdata.sgs.4389/dados/ultimos/1?formato=json',{signal:AbortSignal.timeout(12000)});if(!r.ok)throw Error('Falha na consulta');const rows=await r.json(),last=rows.at(-1),value=Number(last.valor.replace(',','.'));if(!Number.isFinite(value)||value<=0||!/^\d{2}\/\d{2}\/\d{4}$/.test(last.data))throw Error('Taxa inválida');cdi={value,date:last.data};cdiError=false;try{localStorage.setItem(storageKey+':cdi',JSON.stringify(cdi));}catch(e){} }catch(e){cdiError=true;}updateCDIView();
 }
 const originalGo=go;go=function(tab){originalGo(tab);if(tab==='investments')updateCDIView();};
-render();fetchCDI();
+save();render();fetchCDI();

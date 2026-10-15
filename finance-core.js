@@ -48,6 +48,7 @@ const FinanceCore = (() => {
     for(const c of d.cards)if(!Number.isFinite(c.openingInvoice)||!Number.isFinite(c.invoiceTotal))throw Error('Fatura inválida.');
     for(const t of d.bankTransactions)if(!Array.isArray(t.details)||!/^\d{4}-\d{2}-\d{2}$/.test(t.date))throw Error('Movimento bancário inválido.');
     for(const s of d.investmentSnapshots)if(!Array.isArray(s.positions)||!Number.isFinite(s.total))throw Error('Posição inválida.');
+    if(d.recognitionEvidence!==undefined&&!Array.isArray(d.recognitionEvidence))throw Error('Regras de reconhecimento inválidas.');
     return true;
   }
   return {sum,cashBalance,invoiceTotal,cardSpending,cashSeries,mergeRecords,validate};
