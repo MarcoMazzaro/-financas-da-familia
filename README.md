@@ -43,3 +43,7 @@ Teste das regras: `node finance-core.test.cjs`. A interface local foi verificada
 Na conta corrente, Importar lançamentos aceita JSON estruturado com `accountId`, `asOf` e `bankTransactions` (cada registro: `id` estável, `date` ISO, `description`, `value` numérico com sinal e `details` como lista de textos). A prévia não altera o estado. A confirmação mescla IDs sem duplicar registros existentes, preserva revisões e aplica regras aos novos movimentos. Não é um leitor universal de PDF/Excel, nem importa novas faturas de cartão. Cópias de segurança incluem as regras locais.
 
 Validação adicional: `node recognition.test.cjs`, além de simulação isolada com revisões fictícias, preservação do estado existente, prévia, nova importação e reimportação. A simulação não acessa o navegador do usuário nem suas revisões reais.
+
+### Parcelas a vencer
+
+A aba Cartões mostra uma projeção mensal derivada das parcelas restantes após a fatura de referência, com vencimento contratual dia 11. Compras e estornos parcelados são calculados em centavos; anuidades brutas são separadas, sem presumir descontos futuros. Pagamentos, parcelas já finalizadas e compras à vista não entram como novas parcelas. Há resumo por portador, detalhe por compra e consolidação mensal dos cartões. Diferenças com campos do emissor ficam visíveis. A projeção não inclui novas compras, assinaturas recorrentes à vista nem futuras alterações contratuais. Teste: `node installments.test.cjs`.

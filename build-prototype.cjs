@@ -8,6 +8,6 @@ const core=fs.readFileSync(path.join(__dirname,'finance-core.js'),'utf8'),ui=fs.
 new vm.Script(core);new vm.Script(ui);
 const encode=s=>s.replace(/</g,'\\u003c').replace(/>/g,'\\u003e').replace(/&/g,'\\u0026');
 let html=fs.readFileSync(path.join(__dirname,'prototype-v2.html'),'utf8');
-html=html.replace('__PRIVATE_DATA__',()=>encode(JSON.stringify(data))).replace('__FINANCE_CORE__',()=>core).replace('__RECOGNITION__',()=>fs.readFileSync(path.join(__dirname,'recognition.js'),'utf8')).replace('__PROTOTYPE_UI__',()=>ui);
+html=html.replace('__PRIVATE_DATA__',()=>encode(JSON.stringify(data))).replace('__FINANCE_CORE__',()=>core).replace('__RECOGNITION__',()=>fs.readFileSync(path.join(__dirname,'recognition.js'),'utf8')).replace('__INSTALLMENTS__',()=>fs.readFileSync(path.join(__dirname,'installments.js'),'utf8')).replace('__PROTOTYPE_UI__',()=>ui);
 fs.mkdirSync(path.dirname(path.resolve(output)),{recursive:true});fs.writeFileSync(output,html);
 console.log('Local prototype built. Contains private data; do not publish it.');

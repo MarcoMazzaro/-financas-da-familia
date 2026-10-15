@@ -1,0 +1,9 @@
+const assert=require('node:assert/strict'),I=require('./installments.js');
+const card={id:'test',dueDate:'2026-10-11',dueDay:11,futureInstallmentBalance:160};
+const rows=[{id:'buy',cardId:'test',kind:'purchase',description:'Compra',value:100,installment:{current:2,total:4}},{id:'refund',cardId:'test',kind:'refund',description:'Estorno',value:-20,installment:{current:2,total:4}},{id:'fee',cardId:'test',kind:'fee',description:'ANUIDADE',value:10,installment:{current:10,total:12}},{id:'discount',cardId:'test',kind:'fee',description:'DESCONTO ANUIDADE',value:-10,installment:{current:10,total:12}},{id:'paid',cardId:'test',kind:'purchase',description:'Quitada',value:900,installment:{current:4,total:4}},{id:'payment',cardId:'test',kind:'payment',description:'Pagamento',value:-1000,installment:{current:1,total:10}},{id:'other',cardId:'other',kind:'purchase',value:500,installment:{current:1,total:8}}];
+const s=I.schedule(card,rows);assert.equal(s.months.length,2);assert.equal(s.months[0].due,'2026-11-11');assert.equal(s.months[1].due,'2026-12-11');assert.equal(s.purchaseTotal,160);assert.equal(s.feeTotal,20);assert.equal(s.total,180);assert.equal(s.reportedDifference,0);assert.equal(s.items.length,3);
+assert.equal(s.months[0].netPurchases,80);assert.equal(s.months[0].entries[0].installment,3);
+assert.equal(I.dueAfter({dueDate:'2027-01-31',dueDay:31},1),'2027-02-28');
+assert.equal(I.dueAfter({dueDate:'2027-12-11',dueDay:11},1),'2028-01-11');
+const zero=I.schedule(card,rows.filter(t=>['payment','paid','other'].includes(t.id)));assert.equal(zero.total,0);assert.equal(zero.months.length,0);
+console.log('Passed remaining installments only, signed refunds, separate gross fees, no assumed discounts, invoice/card separation, month rollover and maturity dates.');
