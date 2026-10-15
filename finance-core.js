@@ -49,6 +49,10 @@ const FinanceCore = (() => {
     for(const t of d.bankTransactions)if(!Array.isArray(t.details)||!/^\d{4}-\d{2}-\d{2}$/.test(t.date))throw Error('Movimento bancário inválido.');
     for(const s of d.investmentSnapshots)if(!Array.isArray(s.positions)||!Number.isFinite(s.total))throw Error('Posição inválida.');
     if(d.recognitionEvidence!==undefined&&!Array.isArray(d.recognitionEvidence))throw Error('Regras de reconhecimento inválidas.');
+    if(d.recurringIncomes!==undefined){
+      if(!Array.isArray(d.recurringIncomes))throw Error('Receitas recorrentes inválidas.');
+      for(const i of d.recurringIncomes)if(!i.id||typeof i.name!=='string'||!Number.isFinite(i.amount)||i.amount<=0||!/^\d{4}-\d{2}-\d{2}$/.test(i.startDate||'')||Number.isNaN(Date.parse(i.startDate))||new Date(i.startDate).toISOString().slice(0,10)!==i.startDate||!d.accounts.some(a=>a.id===i.accountId))throw Error('Confira os dados do salário mensal.');
+    }
     return true;
   }
   return {sum,cashBalance,invoiceTotal,cardSpending,cashSeries,mergeRecords,validate};

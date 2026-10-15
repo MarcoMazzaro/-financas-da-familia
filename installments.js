@@ -26,7 +26,7 @@ const Installments=(()=>{
   const purchaseTotal=result.reduce((s,m)=>s+cents(m.netPurchases),0)/100,feeTotal=result.reduce((s,m)=>s+cents(m.fees),0)/100;
   return {cardId:card.id,months:result,items,purchaseTotal,feeTotal,total:(cents(purchaseTotal)+cents(feeTotal))/100,reportedDifference:Number.isFinite(card.futureInstallmentBalance)?(cents(purchaseTotal)-cents(card.futureInstallmentBalance))/100:null,nextFieldDifference:result.length&&Number.isFinite(card.nextInstallments)?(cents(card.nextInstallments)-cents(result[0].netPurchases))/100:null,feeRoundingDifference:Number.isFinite(card.futureFeeBalance)?(cents(feeTotal)-cents(card.futureFeeBalance))/100:null};
  }
- function forecastRows(state){
+ function forecastRows(state,endDate){
   const rows=[...state.bankTransactions];
   for(const card of state.cards){
    const brand=/mastercard/i.test(card.name)?'MASTERCARD':/visa/i.test(card.name)?'VISA':null;
@@ -35,6 +35,21 @@ const Installments=(()=>{
     const booked=state.bankTransactions.filter(t=>t.date===month.due&&t.value<0&&(t.cardId===card.id||t.invoiceCardId===card.id||t.kind==='card_payment'&&brand&&[t.description,...(t.details||[])].join(' ').toUpperCase().includes(brand))).reduce((s,t)=>s+cents(-t.value),0);
     const remaining=Math.max(0,cents(month.total)-booked);
     if(remaining)rows.push({id:'forecast:'+card.id+':'+month.due,cardId:card.id,date:month.due,value:-remaining/100,description:'Previsão de parcelas e anuidade · '+card.name,future:true,kind:'card_forecast'});
+   }
+  }
+  const defaultEnd=new Date(state.asOf+'T00:00:00Z');defaultEnd.setUTCFullYear(defaultEnd.getUTCFullYear()+1);
+  const horizon=endDate||defaultEnd.toISOString().slice(0,10),accountId=state.accounts?.[0]?.id;
+  for(const income of state.recurringIncomes||[]){
+   if(income.active===false||income.accountId!==accountId||!Number.isFinite(income.amount)||income.amount<=0||!/^\d{4}-\d{2}-\d{2}$/.test(income.startDate||''))continue;
+   const [year,month,day]=income.startDate.split('-').map(Number);
+   const start=new Date(state.asOf+'T00:00:00Z');let offset=Math.max(0,(start.getUTCFullYear()-year)*12+start.getUTCMonth()-(month-1));
+   for(let guard=0;guard<24;guard++,offset++){
+    const first=new Date(Date.UTC(year,month-1+offset,1)),last=new Date(Date.UTC(first.getUTCFullYear(),first.getUTCMonth()+1,0)).getUTCDate();
+    const due=[first.getUTCFullYear(),String(first.getUTCMonth()+1).padStart(2,'0'),String(Math.min(day,last)).padStart(2,'0')].join('-');
+    if(due>horizon)break;if(due<=state.asOf||due<income.startDate)continue;
+    const booked=state.bankTransactions.filter(t=>t.value>0&&t.date===due&&(!t.accountId||t.accountId===income.accountId)&&(t.recurringIncomeId===income.id||t.kind==='salary'&&t.description===income.name)).reduce((s,t)=>s+cents(t.value),0);
+    const remaining=Math.max(0,cents(income.amount)-booked);
+    if(remaining)rows.push({id:'income-forecast:'+income.id+':'+due,recurringIncomeId:income.id,accountId:income.accountId,date:due,value:remaining/100,description:income.name,future:true,kind:'income_forecast'});
    }
   }
   return rows;
