@@ -1,6 +1,18 @@
 // Derive future installments from the paid reference invoice, not original purchase dates.
 const Installments=(()=>{
  const cents=n=>Math.round(n*100);
+ function incomeDueDate(year,month,day,previousBusinessDay=false,extraHolidays=[]){
+  const last=new Date(Date.UTC(year,month,0)).getUTCDate(),date=new Date(Date.UTC(year,month-1,Math.min(day,last)));
+  if(previousBusinessDay){
+   // Gregorian Easter gives the movable banking holidays. Fixed dates follow FEBRABAN.
+   const a=year%19,b=Math.floor(year/100),c=year%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451),n=h+l-7*m+114;
+   const easter=new Date(Date.UTC(year,Math.floor(n/31)-1,n%31+1)),holidays=new Set(extraHolidays);
+   for(const md of ['01-01','04-21','05-01','09-07','10-12','11-02','11-15','11-20','12-25','12-31'])holidays.add(year+'-'+md);
+   for(const offset of [-48,-47,-2,60]){const t=new Date(easter);t.setUTCDate(t.getUTCDate()+offset);holidays.add(t.toISOString().slice(0,10));}
+   while([0,6].includes(date.getUTCDay())||holidays.has(date.toISOString().slice(0,10)))date.setUTCDate(date.getUTCDate()-1);
+  }
+  return date.toISOString().slice(0,10);
+ }
  function dueAfter(card,offset){
   const [year,month]=card.dueDate.split('-').map(Number),first=new Date(Date.UTC(year,month-1+offset,1));
   const last=new Date(Date.UTC(first.getUTCFullYear(),first.getUTCMonth()+1,0)).getUTCDate();
@@ -44,9 +56,10 @@ const Installments=(()=>{
    const [year,month,day]=income.startDate.split('-').map(Number);
    const start=new Date(state.asOf+'T00:00:00Z');let offset=Math.max(0,(start.getUTCFullYear()-year)*12+start.getUTCMonth()-(month-1));
    for(let guard=0;guard<24;guard++,offset++){
-    const first=new Date(Date.UTC(year,month-1+offset,1)),last=new Date(Date.UTC(first.getUTCFullYear(),first.getUTCMonth()+1,0)).getUTCDate();
-    const due=[first.getUTCFullYear(),String(first.getUTCMonth()+1).padStart(2,'0'),String(Math.min(day,last)).padStart(2,'0')].join('-');
+    const first=new Date(Date.UTC(year,month-1+offset,1));
+    const due=incomeDueDate(first.getUTCFullYear(),first.getUTCMonth()+1,income.paymentDay||day,income.businessDayRule==='previous',state.additionalHolidays||[]);
     if(due>horizon)break;if(due<=state.asOf||due<income.startDate)continue;
+    if(Array.isArray(income.months)&&!income.months.includes(first.getUTCMonth()+1))continue;
     const booked=state.bankTransactions.filter(t=>t.value>0&&t.date===due&&(!t.accountId||t.accountId===income.accountId)&&(t.recurringIncomeId===income.id||t.kind==='salary'&&t.description===income.name)).reduce((s,t)=>s+cents(t.value),0);
     const remaining=Math.max(0,cents(income.amount)-booked);
     if(remaining)rows.push({id:'income-forecast:'+income.id+':'+due,recurringIncomeId:income.id,accountId:income.accountId,date:due,value:remaining/100,description:income.name,future:true,kind:'income_forecast'});
@@ -54,6 +67,6 @@ const Installments=(()=>{
   }
   return rows;
  }
- return {schedule,dueAfter,forecastRows};
+ return {schedule,dueAfter,forecastRows,incomeDueDate};
 })();
 if(typeof module!=='undefined')module.exports=Installments;

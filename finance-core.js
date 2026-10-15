@@ -52,6 +52,7 @@ const FinanceCore = (() => {
     if(d.recurringIncomes!==undefined){
       if(!Array.isArray(d.recurringIncomes))throw Error('Receitas recorrentes inválidas.');
       for(const i of d.recurringIncomes)if(!i.id||typeof i.name!=='string'||!Number.isFinite(i.amount)||i.amount<=0||!/^\d{4}-\d{2}-\d{2}$/.test(i.startDate||'')||Number.isNaN(Date.parse(i.startDate))||new Date(i.startDate).toISOString().slice(0,10)!==i.startDate||!d.accounts.some(a=>a.id===i.accountId))throw Error('Confira os dados do salário mensal.');
+      for(const i of d.recurringIncomes)if(i.months!==undefined&&(!Array.isArray(i.months)||!i.months.length||i.months.some(m=>!Number.isInteger(m)||m<1||m>12)))throw Error('Confira os meses da gratificação.');
     }
     return true;
   }
